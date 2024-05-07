@@ -1,6 +1,3 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: Apache-2.0
-
 import awsConfig from "@/config/aws-config";
 import {
   CognitoIdentityProviderClient,
@@ -9,10 +6,19 @@ import {
   ConfirmSignUpCommand,
   InitiateAuthCommandInput,
 } from "@aws-sdk/client-cognito-identity-provider";
-
 export const cognitoClient = new CognitoIdentityProviderClient({
   region: awsConfig.region,
 });
+
+import axios from "axios";
+import { initializeKMSClient } from "./kmsService";
+import { initializeSecretsClient } from "./secretManagerService";
+
+interface TokenResponse {
+  access_token: string;
+  expires_in: number;
+  token_type: string;
+}
 
 export const signIn = async (username: string, password: string) => {
   const params: InitiateAuthCommandInput = {
@@ -36,6 +42,10 @@ export const signIn = async (username: string, password: string) => {
         "refreshToken",
         AuthenticationResult.RefreshToken || ""
       );
+      const ccbToken = await getCCBToken();
+      sessionStorage.setItem("ccbToken", ccbToken || "");
+      initializeSecretsClient();
+      initializeKMSClient();
       return AuthenticationResult;
     }
   } catch (error) {
@@ -86,4 +96,33 @@ export const confirmSignUp = async (username: string, code: string) => {
 
 export const logout = () => {
   sessionStorage.clear();
+};
+
+const getCCBToken = async () => {
+  try {
+    const response = await axios.post<TokenResponse>(
+      process.env.NEXT_PUBLIC_TOKEN_URL as string,
+      new URLSearchParams({
+        grant_type: "client_credentials",
+      }),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${Buffer.from(
+            process.env.NEXT_PUBLIC_CLIENT_ID +
+              ":" +
+              process.env.NEXT_PUBLIC_CLIENT_SECRET
+          ).toString("base64")}`,
+        },
+      }
+    );
+
+    if (response.status === 200) {
+      return response.data.access_token;
+    }
+  } catch (error) {
+    console.error("Error while fetching CCB token:", error);
+  }
+
+  return null;
 };

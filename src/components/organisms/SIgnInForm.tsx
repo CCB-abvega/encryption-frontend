@@ -56,7 +56,6 @@ const onFormSubmit = async (
   if (!response?.AccessToken) {
     console.log("Usuario o contraseña invalidos");
   }
-  alert(response);
 };
 
 const SignInForm: React.FC = () => {
