@@ -93,9 +93,9 @@ const SignInForm: React.FC = () => {
               password: "",
             }}
             validationSchema={signInSchema}
-            onSubmit={(values, { setSubmitting }) => {
-              onFormSubmit(values, setSubmitting);
-              router.push("/home");
+            onSubmit={async (values, { setSubmitting }) => {
+              await onFormSubmit(values, setSubmitting);
+              router.push("/");
             }}
           >
             {({ isSubmitting, errors, touched, setErrors }) => (

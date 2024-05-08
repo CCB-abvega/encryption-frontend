@@ -25,7 +25,7 @@ export default function RootLayout({
     <html className='h-full' lang='en' suppressHydrationWarning={true}>
       <body
         className={cn(
-          "h-full bg-background font-sans antialiased",
+          "h-full bg-background font-sans antialiased flex justify-center",
           fontSans.variable
         )}
       >
@@ -35,10 +35,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ThemeToggle />
-
           <Toaster />
-          <main className='h-full'>{children}</main>
+          <main className='h-full'>
+            <ThemeToggle />
+            {children}
+          </main>
         </ThemeProvider>
       </body>
     </html>
