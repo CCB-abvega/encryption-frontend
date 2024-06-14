@@ -2,8 +2,21 @@ import awsConfig from "@/config/aws-config";
 import { KMSClient, DecryptCommand } from "@aws-sdk/client-kms";
 import { fromCognitoIdentityPool } from "@aws-sdk/credential-providers";
 import { getSecret } from "./secretManagerService";
+import privateApi from "./privateApi";
+import services from "./services";
 
 let kmsClient: KMSClient;
+
+export async function obtainPublicKey(userId:string){
+
+  const response =  await privateApi.post<{data:{
+       public_key:string
+   }}>(process.env.NEXT_PUBLIC_API_URL+services.private.getKey,{
+       user_id: userId
+   })
+
+   sessionStorage.setItem('public_key',response.data.public_key)
+}
 
 function initializeKMSClient() {
   const idToken = getToken();
@@ -33,22 +46,19 @@ function getToken() {
   return sessionStorage.getItem("idToken") || "";
 }
 
-export async function decryptData(iv_ciphertext_base64: string) {
-  const encrypted_dek_base64 = await getEncryptedDek();
-  const encrypted_dek = Uint8Array.from(atob(encrypted_dek_base64), (c) =>
-    c.charCodeAt(0)
-  );
+export async function decryptData(iv_ciphertext_base64: string, encodedDek:string) {
+  const privateKey = process.env.NEXT_PUBLIC_PRIVATE_KEY;
+  console.log('Private',privateKey)
+  if (!privateKey){
+    return
+  }
+  console.log('Encoded', encodedDek)
+  const importedPrivateKey = await importPrivateKey(privateKey);
+  const plaintextDek = await decryptDataWithRSA(importedPrivateKey,encodedDek);
+
   const iv_ciphertext = Uint8Array.from(atob(iv_ciphertext_base64), (c) =>
     c.charCodeAt(0)
   );
-
-  const response = await kmsClient.send(
-    new DecryptCommand({
-      CiphertextBlob: encrypted_dek,
-    })
-  );
-
-  const plaintextDek = response.Plaintext as Uint8Array;
 
   // Convert IV ciphertext to IV and ciphertext
   const iv = iv_ciphertext.slice(0, 16);
@@ -78,6 +88,58 @@ export async function decryptData(iv_ciphertext_base64: string) {
   return plaintext;
 }
 
+function stripPemFormatting(pem: string): string {
+  return pem
+      .replace(/-----BEGIN .*-----/, '')
+      .replace(/-----END .*-----/, '')
+      .replace(/\s/g, '');
+}
+
+const pemToArrayBuffer = (pem: string): Uint8Array => {
+  const pemContents = stripPemFormatting(pem);
+  const binaryString = atob(pemContents);
+  const uint8Array = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    uint8Array[i] = binaryString.charCodeAt(i);
+  }
+  return uint8Array;
+};
+
+const importPrivateKey = async (pem: string): Promise<CryptoKey> => {
+  const binaryKey = pemToArrayBuffer(pem);
+  return await crypto.subtle.importKey(
+    "pkcs8",
+    binaryKey,
+    {
+      name: "RSA-OAEP",
+      hash: "SHA-256"  
+    },
+    true,
+    ["decrypt"]
+  );
+};
+
+const base64ToArrayBuffer = (base64: string) => {
+  return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+ 
+};
+
+const decryptDataWithRSA = async (privateKey: CryptoKey, data: string): Promise<Uint8Array> => {
+  try {
+    const ciphertext = base64ToArrayBuffer(data);
+    const decryptedData = await crypto.subtle.decrypt(
+      { name: "RSA-OAEP" },
+      privateKey,
+      ciphertext
+    );
+    return new Uint8Array(decryptedData);
+  } catch (error) {
+    console.error("Error during RSA decryption:", error);
+    throw error;
+  }
+};
+
+
 const getEncryptedDek = async () => {
   let encryptedDek = sessionStorage.getItem("encryptedDek") || "";
   if (!encryptedDek) {
@@ -90,6 +152,6 @@ const getEncryptedDek = async () => {
   return encryptedDek;
 };
 
-initializeKMSClient();
+
 
 export { kmsClient, initializeKMSClient };

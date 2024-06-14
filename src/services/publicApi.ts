@@ -1,3 +1,3 @@
 import HttpService from "./http";
 
-export default HttpService.getInstance();
+export default HttpService.getInstance(false);

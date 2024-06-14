@@ -1,6 +1,6 @@
 import HttpService from "./http";
 
-const api: HttpService = HttpService.getInstance(true);
+const api: HttpService = HttpService.getInstance(false);
 
 api.api.addAsyncRequestTransform((request) => async () => {
   const token = sessionStorage.getItem("ccbToken");

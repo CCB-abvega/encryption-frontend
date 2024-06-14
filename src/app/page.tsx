@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { logout } from "@/services/authService";
-import { decryptData, initializeKMSClient } from "@/services/kmsService";
+import { decryptData, initializeKMSClient, obtainPublicKey } from "@/services/kmsService";
 import {
   getSecret,
   initializeSecretsClient,
@@ -39,26 +39,22 @@ const HomePage = () => {
 
     const fetchData = () => {
       initializeClients()
-        .then(() => {
+        .then(async () => {
+          await obtainPublicKey("766970bf-75ca-4aa5-adc0-e36e12d7b7ab")
           privateApi
-            .post<{ encrypted_data: string }>(
-              services.private.avaliablePayments,
+            .post<{ data:{encrypted_data: string, encrypted_data_key:string} }>(
+              services.private.getData,
               {
-                category: "COMMERCIAL",
-                channel: "1",
-                company: 1,
-                country: 1,
-                format: "JSON",
-                ipwebservice: "tty",
-                search: "",
-                source: "n5",
+               public_key: sessionStorage.getItem('public_key')
               },
               { withCredentials: false }
             )
             .then((response) => {
-              decryptData(response.encrypted_data)
+  
+              decryptData(response.data.encrypted_data, response.data.encrypted_data_key)
                 .then((decryptedData) => {
-                  setData(JSON.parse(decryptedData));
+                  console.log(decryptedData)
+                  setData(decryptedData || '');
                 })
                 .catch((error) => {
                   console.error(error);
@@ -79,7 +75,7 @@ const HomePage = () => {
   return (
     <Fragment>
       <section className='flex justify-center flex-col items-center w-full h-full overflow-hidden'>
-        <h1>Calling service {services.private.avaliablePayments}</h1>
+        <h1>Calling service {services.private.getData}</h1>
         <pre className='p-4 overflow-auto rounded-sm bg-slate-200 h-[500px] w-[500px]'>
           <code className='text-left whitespace-pre leading-normal text-pretty text-black'>
             {JSON.stringify(data, null, 4)}

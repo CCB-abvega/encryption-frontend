@@ -48,6 +48,6 @@ export async function getSecret(secretName: string) {
   return JSON.parse(response.SecretString || "{}") as EncryptedDataKey;
 }
 
-initializeSecretsClient();
+//initializeSecretsClient();
 
 export { secretsClient, initializeSecretsClient };
